@@ -4,3 +4,4 @@ main
 .terraform/
 terraform.tfstate.backup
 terraform.tfstate
+tplan
