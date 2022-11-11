@@ -12,6 +12,11 @@ provider "aws" {
   region = "us-west-2"
 }
 
+variable "region" {
+  type    = string
+  default = "us-west-2"
+}
+
 resource "aws_iam_role" "iam_for_lambda" {
   name = "iam_for_lambda"
 
@@ -30,6 +35,59 @@ resource "aws_iam_role" "iam_for_lambda" {
   ]
 }
 EOF
+}
+
+resource "aws_api_gateway_rest_api" "aws_trigger" {
+
+  name = "aws_trigger"
+
+  # endpoint_configuration {
+  #   types = ["REGIONAL"]
+  # }
+}
+
+resource "aws_api_gateway_deployment" "aws_trigger" {
+  rest_api_id = aws_api_gateway_rest_api.aws_trigger.id
+
+  triggers = {
+    redeployment = sha1(jsonencode(aws_api_gateway_rest_api.aws_trigger.body))
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_api_gateway_stage" "aws_trigger" {
+  deployment_id = aws_api_gateway_deployment.aws_trigger.id
+  rest_api_id   = aws_api_gateway_rest_api.aws_trigger.id
+  stage_name    = "aws_trigger"
+}
+
+resource "aws_api_gateway_resource" "resource" {
+  path_part   = "resource"
+  parent_id   = aws_api_gateway_rest_api.aws_trigger.root_resource_id
+  rest_api_id = aws_api_gateway_rest_api.aws_trigger.id
+}
+
+resource "aws_api_gateway_method" "method" {
+  rest_api_id   = aws_api_gateway_rest_api.aws_trigger.id
+  resource_id   = aws_api_gateway_resource.resource.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+# Integration
+resource "aws_api_gateway_integration" "thursday_integration" {
+  rest_api_id = "${aws_api_gateway_rest_api.aws_trigger.id}"
+  resource_id = "${aws_api_gateway_resource.resource.id}"
+  http_method = "${aws_api_gateway_method.method.http_method}"
+  uri = "arn:aws:apigateway:${var.region}:lambda:path/2015-03-31/functions/${aws_lambda_function.thursday_lambda.arn}/invocations"
+  type = "AWS"                           # Documentation not clear
+  integration_http_method = "POST"       # Not documented
+  # request_templates = {                  # Not documented
+  #   "application/json" = "${file("api_gateway_body_mapping.template")}"
+  # }
 }
 
 resource "aws_lambda_function" "thursday_lambda" {

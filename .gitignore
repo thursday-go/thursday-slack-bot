@@ -2,3 +2,5 @@ artifact/main.zip
 main
 
 .terraform/
+terraform.tfstate.backup
+terraform.tfstate
